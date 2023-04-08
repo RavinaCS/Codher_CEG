@@ -1,0 +1,178 @@
+
+Option Explicit
+Sub Button1_Click()
+
+Dim fullpath As Variant
+Dim wb1 As Workbook
+Dim i, j, k, b2row, ttrow, tallyrow, strres, Rowz, tc, tr As Integer
+Dim b2taxval, tallytaxval, suminv As Double
+Dim cellvalue, InputRange As Range
+Dim CUnique As New Collection
+Dim Ucount As Integer
+Dim location, b2gst, tallygst, b2invnum, tallyinvnum As Variant
+Dim b2date, tallydate As String
+Dim b2legalname, tallylegalname As String
+Dim myrange As Range
+Dim flag() As Integer
+Dim fd As Office.FileDialog
+Dim filename As String
+Dim cfind As Range
+
+Set fd = Application.FileDialog(msoFileDialogFilePicker)
+With fd
+        .Filters.Clear      ' Clear all the filters (if applied before).
+       
+        ' Give the dialog box a title, word for doc or Excel for excel files.
+        .Title = "Select a Word File"
+       
+        ' Apply filter to show only a particular type of files.
+        ' For example, *.doc? to show only word files or
+        ' *.xlsx? to show only excel files.
+        .Filters.Add "Excel Files", "*.xlsx?", 1
+       
+        ' Do not allow users to select more than one file.
+        ' Set the value as "True" to select multiple files.
+        .AllowMultiSelect = False
+   
+        ' Show the file.
+        .Show
+        fullpath = .SelectedItems.Item(1)
+End With
+Cells(1, 2).Value = fullpath
+
+
+location = Sheets("Sheet1").Cells(1, 2).Value
+
+Set wb1 = Workbooks.Open(location)
+            
+b2row = wb1.Sheets("2B").Cells(Rows.Count, 1).End(xlUp).Row
+ttrow = wb1.Sheets("Tally").Cells(Rows.Count, 3).End(xlUp).Row
+tallyrow = ttrow - 1 ' reducing grand total row
+
+With wb1.Sheets("Tally").Range("H1:H" & tallyrow)
+     Set cfind = .Find(what:="Amount", lookat:=xlWhole, MatchCase:=False, searchformat:=False)
+        If Not cfind Is Nothing Then
+            tc = cfind.Row
+        End If
+End With
+
+    tr = tc + 1
+
+Set InputRange = wb1.Sheets("2B").Range("A7:A" & b2row)
+
+On Error Resume Next
+'Adding unique items to collection from defined range
+For Each cellvalue In InputRange
+    CUnique.Add cellvalue.Value, CStr(cellvalue.Value)
+Next
+On Error GoTo 0
+'Getting count of unique item in the collection
+Ucount = CUnique.Count
+'suminv = 0
+
+ReDim flag(tallyrow) As Integer
+For k = 1 To tallyrow
+flag(k) = 0
+Next k
+
+
+For i = 1 To Ucount
+
+    For j = 7 To b2row
+            b2gst = wb1.Sheets("2B").Range("A" & j).Value
+            b2taxval = wb1.Sheets("2B").Range("J" & j).Value
+            b2legalname = wb1.Sheets("2B").Range("B" & j).Value
+            b2invnum = wb1.Sheets("2B").Range("C" & j).Value
+            b2date = WorksheetFunction.Text(wb1.Sheets("2B").Range("E" & j).Value, "dd/mm/yyyy")
+            'b2date = wb1.Sheets("2B").Range("E" & j).Value
+            suminv = 0
+            
+                           
+            If b2gst = CUnique(i) Then
+            
+              For k = tr To tallyrow
+                  tallygst = wb1.Sheets("Tally").Range("C" & k).Value
+                  tallytaxval = wb1.Sheets("Tally").Range("H" & k).Value
+                  tallylegalname = wb1.Sheets("Tally").Range("B" & k).Value
+                  tallyinvnum = wb1.Sheets("Tally").Range("F" & k).Value
+                  tallydate = WorksheetFunction.Text(wb1.Sheets("Tally").Range("G" & k).Value, "dd/mm/yyyy")
+                  'tallydate = wb1.Sheets("Tally").Range("G" & k).Value
+                  
+                    If tallytaxval < 0 Then
+                    wb1.Sheets("Tally").Range("A" & k & ":M" & k).Interior.Color = RGB(0, 255, 255)
+                    flag(k) = 1
+                    End If
+                    
+'                    If tallygst = "" Then
+'                      wb1.Sheets("Tally").Range("A" & k & ":M" & k).Interior.Color = RGB(255, 255, 0)
+'                      flag(k) = 1
+'                    End If
+                  
+                     If b2gst = tallygst And Fix(b2taxval) = Fix(tallytaxval) And b2date = tallydate And b2invnum = tallyinvnum Then
+                         wb1.Sheets("2B").Range("A" & j & ":V" & j).Interior.Color = RGB(255, 255, 0)
+                         wb1.Sheets("Tally").Range("A" & k & ":M" & k).Interior.Color = RGB(255, 255, 0)
+                         flag(k) = 1
+                         Exit For
+'                        ElseIf b2gst = tallygst And Fix(b2taxval) = Fix(tallytaxval) And b2invnum = tallyinvnum Then
+ '                        wb1.Sheets("2B").Range("A" & j & ":V" & j).Interior.Color = RGB(255, 255, 0)
+  '                       wb1.Sheets("Tally").Range("A" & k & ":M" & k).Interior.Color = RGB(255, 255, 0)
+   '                      flag(k) = 1
+    '                     Exit For
+                         
+                     ElseIf b2gst = tallygst And b2date = tallydate And b2taxval <> tallytaxval Then
+                        
+                            suminv = WorksheetFunction.SumIfs(wb1.Sheets("2B").Range("J7:J" & b2row), wb1.Sheets("2B").Range("C7:C" & b2row), b2invnum, wb1.Sheets("2B").Range("E7:E" & b2row), b2date)
+                            If suminv = tallytaxval Then
+                             wb1.Sheets("2B").Range("A" & j & ":V" & j).Interior.Color = RGB(255, 255, 0)
+                             wb1.Sheets("Tally").Range("A" & k & ":M" & k).Interior.Color = RGB(255, 255, 0)
+                             flag(k) = 1
+                             Exit For
+                            End If
+                            
+                            'Exit For
+                     Else
+                         wb1.Sheets("2B").Range("A" & j & ":V" & j).Interior.Color = RGB(204, 153, 255)
+                        'wb1.Sheets("Tally").Range("H" & k).Interior.Color = RGB(255, 0, 0)
+                         'Exit For
+                      End If
+               Next k
+            End If
+    Next j
+Next i
+
+For k = tr To tallyrow
+
+If flag(k) = 0 Then
+wb1.Sheets("Tally").Range("A" & k & ":M" & k).Interior.Color = RGB(204, 153, 255)
+End If
+
+Next k
+
+wb1.Sheets("2B").Range("I" & b2row + 2).Value = "Sum of Matched Bills in 2B and Tally"
+
+wb1.Sheets("2B").Range("I" & b2row + 4).Value = "2B Sum"
+wb1.Sheets("2B").Range("A5:W6").AutoFilter Field:=10, Criteria1:=RGB(255, 255, 0), Operator:=xlFilterCellColor
+Set myrange = wb1.Sheets("2B").Range("J:J").Rows.SpecialCells(xlCellTypeVisible)
+wb1.Sheets("2B").Range("J" & b2row + 4).Value = WorksheetFunction.Sum(myrange.SpecialCells(xlCellTypeVisible))
+
+wb1.Sheets("2B").Range("I" & b2row + 5).Value = "Tally Sum"
+wb1.Sheets("Tally").Range("A5:M6").AutoFilter Field:=8, Criteria1:=RGB(255, 255, 0), Operator:=xlFilterCellColor
+Set myrange = wb1.Sheets("Tally").Range("H:H").Rows.SpecialCells(xlCellTypeVisible)
+wb1.Sheets("2B").Range("J" & b2row + 5).Value = WorksheetFunction.Sum(myrange.SpecialCells(xlCellTypeVisible))
+
+wb1.Sheets("Tally").Range("C" & ttrow + 3).Interior.Color = RGB(255, 255, 0)
+wb1.Sheets("Tally").Range("D" & ttrow + 3).Value = "Matched Bills"
+
+wb1.Sheets("Tally").Range("C" & ttrow + 5).Interior.Color = RGB(204, 153, 255)
+wb1.Sheets("Tally").Range("D" & ttrow + 5).Value = "Mismatched Bills"
+
+wb1.Sheets("Tally").Range("C" & ttrow + 7).Interior.Color = RGB(0, 255, 255)
+wb1.Sheets("Tally").Range("D" & ttrow + 7).Value = "Debit Note(Tally)"
+
+
+
+wb1.Sheets("2B").AutoFilter.ShowAllData
+wb1.Sheets("Tally").AutoFilter.ShowAllData
+
+End Sub
+
